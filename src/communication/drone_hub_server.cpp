@@ -94,6 +94,7 @@ void DroneHubServer::process_message(const std::string& json_message) {
                     double lat = msg_text.at("target_lat").get<double>();
                     double lon = msg_text.at("target_long").get<double>();
                     double alt = msg_text.at("target_alt").get<double>();
+                    double v=msg_text.at("target_vel").get<double>();
 
                     std::cout << "\n[HUB-ACTION] Relaying Mission to Drone "
                               << assigned_drone << "...\n";
@@ -102,15 +103,19 @@ void DroneHubServer::process_message(const std::string& json_message) {
                         if (m_mavlink_bridge.get_manager().get_cdrone_id(kv.first) ==
                             assigned_drone) {
                             int sysid = kv.first;
-                            sendCommandsToSerial("/dev/ttyUSB0", "2\n");
-                            std::cout << "sent launch cmd" << std::endl;
-                            std::this_thread::sleep_for(std::chrono::seconds(10));
+                            //sendCommandsToSerial("/dev/ttyUSB0", "2\n");
+                            std::cout << "sent launch cmd"<< v << std::endl;
                             
                             m_mavlink_bridge.set_mode_guided(sysid);
-                            //m_mavlink_bridge.arm(sysid);
-                            //m_mavlink_bridge.takeoff(sysid, 10.0f);
                             std::this_thread::sleep_for(std::chrono::seconds(1));
-                            m_mavlink_bridge.reposition(sysid, lat, lon, alt);
+
+                            m_mavlink_bridge.arm(sysid);
+                            std::this_thread::sleep_for(std::chrono::seconds(2));
+
+                            m_mavlink_bridge.takeoff(sysid, alt);
+                            std::this_thread::sleep_for(std::chrono::seconds(10));
+
+                            m_mavlink_bridge.reposition(sysid, lat, lon, alt, v);
                         }
                     }
                 } else {
@@ -130,13 +135,14 @@ void DroneHubServer::process_message(const std::string& json_message) {
                     double lat = msg_text.at("target_lat").get<double>();
                     double lon = msg_text.at("target_long").get<double>();
                     double alt = msg_text.at("target_alt").get<double>();
+                    double v=msg_text.at("target_vel").get<double>();
 
                     auto drones = m_mavlink_bridge.snapshot_status();
                     for (auto &kv : drones) {
                         if (m_mavlink_bridge.get_manager().get_cdrone_id(kv.first) ==
                             assigned_drone) {
                             int sysid = kv.first;
-                            m_mavlink_bridge.reposition(sysid, lat, lon, alt);
+                            m_mavlink_bridge.reposition(sysid, lat, lon, alt, v);
                             
                         }
                     }

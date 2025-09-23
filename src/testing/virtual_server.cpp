@@ -143,10 +143,11 @@ void VirtualC2Server::run_test_suite() {
 
     // --- Circle simulation setup ---
     // Center coordinate (from your sample)
-    constexpr double center_lat = 13.053720;
-    constexpr double center_lon = 77.674711;
-    constexpr double center_alt = 20.0; // meters
-
+    constexpr double center_lat = -35.363096;
+    constexpr double center_lon = 149.164760;
+    constexpr double center_alt = 40.0; // meters
+    double vel = 2.0;
+    double vel1=7.0;
     // Circle parameters
     const double radius_deg = 0.0010; // ~111 m per 0.001° latitude (approx)
     const int points = 5;
@@ -159,6 +160,7 @@ void VirtualC2Server::run_test_suite() {
         double lat = center_lat + radius_deg * std::cos(theta);
         double lon = center_lon + radius_deg * std::sin(theta);
         circle.push_back(Waypoint{lat, lon, center_alt});
+        
     }
 
     // --- New requested behavior:
@@ -173,7 +175,7 @@ void VirtualC2Server::run_test_suite() {
                   << first_wp.lat << ", " << first_wp.lon << ", " << first_wp.alt << std::endl;
 
         send_encrypted_message(JsonParser::createMissionAssignment(
-            TRACK_ID, first_wp.lat, first_wp.lon, first_wp.alt, 5, m_session_uuid));
+            TRACK_ID, first_wp.lat, first_wp.lon, first_wp.alt, vel, m_session_uuid));
     } else {
         std::cerr << "[C2] Circle is empty! No MissionAssignment sent." << std::endl;
     }
@@ -189,7 +191,7 @@ void VirtualC2Server::run_test_suite() {
                   << "/" << points << "): " << wp.lat << ", " << wp.lon << ", " << wp.alt << std::endl;
 
         send_encrypted_message(JsonParser::createTargetPositionalUpdate(
-            TRACK_ID, DRONE_ID, wp.lat, wp.lon, wp.alt, 5, m_session_uuid));
+            TRACK_ID, DRONE_ID, wp.lat, wp.lon, wp.alt, vel1, m_session_uuid));
 
         // Wait 10 seconds before the next TPU (but don't wait after the last one)
         if (i < points - 1) {

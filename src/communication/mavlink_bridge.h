@@ -56,7 +56,7 @@ public:
     void send_waypoint(int sysid, double lat, double lon, double alt);
     void takeoff(int sysid, float altitude);
     void circle(int sysid, double lat, double lon, double alt, int turns, float radius);
-    void reposition(int sysid, double lat, double lon, double alt);
+    void reposition(int sysid, double lat_target, double lon_target, double alt_target, double v);
 
     // ack wait
     int wait_for_ack(int sysid, int command, int timeout_ms);

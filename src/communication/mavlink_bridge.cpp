@@ -236,12 +236,85 @@ void MavlinkBridge::circle(int sysid, double lat, double lon, double alt, int tu
               << " at (" << lat << "," << lon << "," << alt << ")\n";
 }
 
-void MavlinkBridge::reposition(int sysid, double lat, double lon, double alt) {
+void MavlinkBridge::reposition(int sysid, double lat, double lon, double alt, double v) {
     auto snap = snapshot_status();
     auto it = snap.find(sysid);
-    if (it == snap.end() || !it->second.has_addr) return;
+    if (it == snap.end() || !it->second.has_addr) {
+        std::cout << "[REPOSITION] no addr for sysid=" << sysid << ", skipping\n";
+        return;
+    }
 
     mavlink_message_t msg;
+
+    // ---------- 1) Send DO_CHANGE_SPEED and wait for ACK ----------
+    // Track and send
+    track_pending_command(sysid, MAV_CMD_DO_CHANGE_SPEED);
+    mavlink_msg_command_long_pack(
+        255, MAV_COMP_ID_MISSIONPLANNER, &msg,
+        sysid, MAV_COMP_ID_AUTOPILOT1,
+        MAV_CMD_DO_CHANGE_SPEED,
+        0,                                 // confirmation
+        1,                                 // param1: 1 = groundspeed
+        static_cast<float>(v),             // param2: speed (m/s)
+        -1, 0, 0, 0, 0                     // param3..7 unused
+    );
+    {
+        uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+        int len = mavlink_msg_to_send_buffer(buf, &msg);
+        send_to_drone(server_addr_, buf, len);
+    }
+    std::cout << "[SEND] sysid=" << sysid << " -> DO_CHANGE_SPEED to " << v << " m/s\n";
+
+    // wait for ACK (2s)
+    int ack_result = wait_for_ack(sysid, MAV_CMD_DO_CHANGE_SPEED, 2000);
+
+    // retry once on timeout
+    if (ack_result == -1) {
+        std::cout << "[REPOSITION] no ACK for DO_CHANGE_SPEED, retrying...\n";
+        track_pending_command(sysid, MAV_CMD_DO_CHANGE_SPEED);
+        mavlink_msg_command_long_pack(
+            255, MAV_COMP_ID_MISSIONPLANNER, &msg,
+            sysid, MAV_COMP_ID_AUTOPILOT1,
+            MAV_CMD_DO_CHANGE_SPEED,
+            0, 1, static_cast<float>(v), -1, 0, 0, 0, 0
+        );
+        {
+            uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+            int len = mavlink_msg_to_send_buffer(buf, &msg);
+            send_to_drone(server_addr_, buf, len);
+        }
+        ack_result = wait_for_ack(sysid, MAV_CMD_DO_CHANGE_SPEED, 2000);
+    }
+
+    // If DO_CHANGE_SPEED not accepted, fallback to PARAM_SET ("WPNAV_SPEED")
+    if (ack_result != MAV_RESULT_ACCEPTED) {
+        std::cerr << "[REPOSITION] DO_CHANGE_SPEED not accepted (result="
+                  << ack_result << "). Falling back to PARAM_SET WPNAV_SPEED.\n";
+
+        // Send PARAM_SET (WPNAV_SPEED in cm/s)
+        float wpnav_speed_cm = static_cast<float>(v * 100.0);
+        // Optionally nudge value to force acceptance if same as last:
+        static float last_wpnav_speed = -1.0f;
+        if (std::abs(wpnav_speed_cm - last_wpnav_speed) < 1e-3f) {
+            wpnav_speed_cm += 1.0f; // nudge by 1 cm/s
+        }
+        last_wpnav_speed = wpnav_speed_cm;
+
+        mavlink_msg_param_set_pack(
+            255, MAV_COMP_ID_MISSIONPLANNER, &msg,
+            sysid, MAV_COMP_ID_AUTOPILOT1,
+            "WPNAV_SPEED", wpnav_speed_cm, MAV_PARAM_TYPE_REAL32
+        );
+        {
+            uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+            int len = mavlink_msg_to_send_buffer(buf, &msg);
+            send_to_drone(server_addr_, buf, len);
+        }
+        // small pause to let autopilot apply it
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    // ---------- 2) Send position target ----------
     uint16_t type_mask =
         POSITION_TARGET_TYPEMASK_VX_IGNORE |
         POSITION_TARGET_TYPEMASK_VY_IGNORE |
@@ -251,26 +324,32 @@ void MavlinkBridge::reposition(int sysid, double lat, double lon, double alt) {
         POSITION_TARGET_TYPEMASK_AZ_IGNORE |
         POSITION_TARGET_TYPEMASK_YAW_IGNORE |
         POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
+        // only position is active
 
     mavlink_msg_set_position_target_global_int_pack(
         255, MAV_COMP_ID_MISSIONPLANNER, &msg,
-        0,
+        0, // time_boot_ms
         sysid, MAV_COMP_ID_AUTOPILOT1,
         MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
         type_mask,
         static_cast<int32_t>(lat * 1e7),
         static_cast<int32_t>(lon * 1e7),
         static_cast<float>(alt),
-        0,0,0, 0,0,0, 0,0
+        0, 0, 0,   // vx,vy,vz ignored
+        0, 0, 0,   // afx,afy,afz ignored
+        0, 0       // yaw,yaw_rate ignored
     );
-
-    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-    int len = mavlink_msg_to_send_buffer(buf, &msg);
-    send_to_drone(server_addr_, buf, len);
+    {
+        uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+        int len = mavlink_msg_to_send_buffer(buf, &msg);
+        send_to_drone(server_addr_, buf, len);
+    }
 
     std::cout << "[SEND] sysid=" << sysid
-              << " -> REPOSITION (lat=" << lat << ", lon=" << lon << ", alt=" << alt << ")\n";
+              << " -> REPOSITION to (" << lat << ", " << lon << ", " << alt
+              << ") at requested speed " << v << " m/s\n";
 }
+
 
 // ---------------- Ack Waiting ----------------
 int MavlinkBridge::wait_for_ack(int sysid, int command, int timeout_ms) {
