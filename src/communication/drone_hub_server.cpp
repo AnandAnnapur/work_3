@@ -12,13 +12,14 @@ using json = nlohmann::json;
 DroneHubServer::DroneHubServer(MavlinkBridge& mavlink_bridge)
     : m_mavlink_bridge(mavlink_bridge) {
     m_udp_handler = std::make_unique<UDPHandler>(
-        DRONE_HUB_RECEIVE_PORT, "127.0.0.1", DRONE_HUB_SEND_PORT);
+        DRONE_HUB_RECEIVE_PORT, "192.168.194.153", DRONE_HUB_SEND_PORT);
     m_aes_handler = std::make_unique<AESHandler>(AES_KEY, AES_IV);
 
     load_track_config("track_config.json");
 
     m_session_uuid = JsonParser::generateUniqueId32();
     std::cout << "[HUB] Session UUID = " << m_session_uuid << std::endl;
+    rtspManager = std::make_unique<RTSPManager>(8554);
 }
 
 void DroneHubServer::send_encrypted_message(const std::string& json_payload) {
@@ -31,6 +32,13 @@ void DroneHubServer::run() {
             [this](const std::string& msg) { this->on_message_received(msg); })) {
         std::cerr << "Failed to start Drone Hub server." << std::endl;
         return;
+    }
+    
+    try {
+        rtspManager->loadConfigYAML("inputs.yaml");  // use config
+    } catch (...) {
+        std::cout << "[RTSP] No config → auto assigning devices" << std::endl;
+        rtspManager->autoAssignDevices();        // fallback
     }
 
     TimingManager timer(1.0);
@@ -94,7 +102,7 @@ void DroneHubServer::process_message(const std::string& json_message) {
                     double lat = msg_text.at("target_lat").get<double>();
                     double lon = msg_text.at("target_long").get<double>();
                     double alt = msg_text.at("target_alt").get<double>();
-                    double v=msg_text.at("target_vel").get<double>();
+                    double v   = msg_text.at("target_vel").get<double>();
 
                     std::cout << "\n[HUB-ACTION] Relaying Mission to Drone "
                               << assigned_drone << "...\n";
@@ -103,18 +111,14 @@ void DroneHubServer::process_message(const std::string& json_message) {
                         if (m_mavlink_bridge.get_manager().get_cdrone_id(kv.first) ==
                             assigned_drone) {
                             int sysid = kv.first;
-                            //sendCommandsToSerial("/dev/ttyUSB0", "2\n");
-                            std::cout << "sent launch cmd"<< v << std::endl;
-                            
+                            sendCommandsToSerial("/dev/ttyUSB1", "2\n");
+                            std::cout << "sent launch cmd" << std::endl;
+                            std::this_thread::sleep_for(std::chrono::seconds(30));
+                            //m_mavlink_bridge.arm(sysid);
+                            //m_mavlink_bridge.takeoff(sysid, 10.0f);
                             m_mavlink_bridge.set_mode_guided(sysid);
-                            std::this_thread::sleep_for(std::chrono::seconds(1));
-
-                            m_mavlink_bridge.arm(sysid);
-                            std::this_thread::sleep_for(std::chrono::seconds(2));
-
-                            m_mavlink_bridge.takeoff(sysid, alt);
-                            std::this_thread::sleep_for(std::chrono::seconds(10));
-
+                            
+                            //std::this_thread::sleep_for(std::chrono::seconds(30));
                             m_mavlink_bridge.reposition(sysid, lat, lon, alt, v);
                         }
                     }
@@ -131,11 +135,11 @@ void DroneHubServer::process_message(const std::string& json_message) {
                      current_state == MissionState::MOVE_TO_TARGET)) {
                     m_state_machine.set_state(MissionState::MOVE_TO_TARGET);
 
-                    const auto& msg_text = parsed.at("message_text");
+                    const auto& msg_text = parsed.at("message_text"); 
                     double lat = msg_text.at("target_lat").get<double>();
                     double lon = msg_text.at("target_long").get<double>();
                     double alt = msg_text.at("target_alt").get<double>();
-                    double v=msg_text.at("target_vel").get<double>();
+                    double v   = msg_text.at("target_vel").get<double>();
 
                     auto drones = m_mavlink_bridge.snapshot_status();
                     for (auto &kv : drones) {

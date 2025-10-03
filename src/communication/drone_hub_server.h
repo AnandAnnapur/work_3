@@ -5,6 +5,7 @@
 #include "mavlink_bridge.h"
 #include "../core/state_machine.h"
 #include "../messages/json_parser.h"
+#include "rtp.h"
 
 #include <memory>
 #include <unordered_map>
@@ -39,5 +40,8 @@ private:
     // Config mappings
     std::unordered_map<std::string, std::string> drone_track_map;   // cdrone_id -> track_id
     std::unordered_map<std::string, std::string> active_missions;   // track_id -> cdrone_id
+    
+    //rtsp steam
+    std::unique_ptr<RTSPManager> rtspManager;
 };
 

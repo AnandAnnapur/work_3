@@ -7,18 +7,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # --- Find Dependencies ---
 find_package(OpenSSL REQUIRED)
 find_package(Boost COMPONENTS system thread REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-rtsp-server-1.0)
+find_package(yaml-cpp REQUIRED)
 
 # --- Include Directories ---
 include_directories(
     src
-    # Add path to nlohmann/json header
-    # e.g., ${CMAKE_CURRENT_SOURCE_DIR}/libs/nlohmann
-    # Add path to MAVLink library
-    # e.g., ${CMAKE_CURRENT_SOURCE_DIR}/libs/c_library_v2
-    /home/zulu/libs/c_library_v2/
+    ${GST_INCLUDE_DIRS}
+    /home/anand/libs/c_library_v2/   # MAVLink
+    # Add path to nlohmann/json if not system-installed
 )
 
-# --- Source Files ---
+link_directories(${GST_LIBRARY_DIRS})
+
+# --- Common Sources ---
 set(COMMON_SOURCES
     src/communication/udp_handler.cpp
     src/messages/json_parser.cpp
@@ -35,6 +38,7 @@ add_executable(drone_hub_system
     src/core/mission_controller.cpp
     src/core/state_machine.cpp
     src/communication/cannister.cpp
+    src/communication/rtp.cpp   # ✅ Add RTSP
     ${COMMON_SOURCES}
 )
 
@@ -45,6 +49,8 @@ target_link_libraries(drone_hub_system
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
+    ${GST_LIBRARIES}   # ✅ Link GStreamer
+    yaml-cpp
 )
 
 # --- Virtual C2 Server Executable ---
@@ -60,8 +66,9 @@ target_link_libraries(virtual_c2_server
     Boost::thread
     OpenSSL::SSL
     OpenSSL::Crypto
-    Threads::Threads
+    Threads::Threads 
 )
 
 # --- Install Commands (Optional) ---
 install(TARGETS drone_hub_system virtual_c2_server DESTINATION bin)
+

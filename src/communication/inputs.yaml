@@ -1,0 +1,35 @@
+rtsp_port: 8554
+streams:
+  - id: "1"
+    input: "/dev/video0"
+    resolution: "640x480"
+    framerate: 30
+    bitrate: 1000
+    encoder: "x264"
+    preset: "superfast"
+    tune: "zerolatency"
+
+  - id: "2"
+    input: "/dev/video2"
+    resolution: "640x480"
+    framerate: 30
+    bitrate: 1000
+    encoder: "x264"
+    preset: "superfast"
+    tune: "zerolatency"
+    
+  - id: "3"
+    input: "rtsp://192.168.1.50:554/live"
+    resolution: "1280x720"
+    framerate: 25
+    bitrate: 2000
+    encoder: "x264"
+    preset: "ultrafast"
+    tune: "zerolatency"
+
+  - id: "4"
+    input: "udp://0.0.0.0:5000"
+    resolution: "1920x1080"
+    framerate: 30
+    bitrate: 4000
+    encoder: "x264"

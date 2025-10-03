@@ -434,6 +434,7 @@ void MavlinkBridge::recv_loop() {
                               << std::endl;
                     pending_acks.erase(key);
                 }
+                update_ack(msg.sysid, ack.command, ack.result);
             }
         }
     }

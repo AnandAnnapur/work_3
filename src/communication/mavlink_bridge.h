@@ -31,9 +31,9 @@ struct DroneStatus {
 
     // hub extensions
     int battery_percent = -1; 
-    int hb_status = 0;
-    int weapon_readiness = 0;
-    int weapon_engaged = 0;
+    int hb_status = 1;
+    int weapon_readiness = 1;
+    int weapon_engaged = 1;
 
     // UDP source
     sockaddr_in src_addr{};
@@ -56,7 +56,7 @@ public:
     void send_waypoint(int sysid, double lat, double lon, double alt);
     void takeoff(int sysid, float altitude);
     void circle(int sysid, double lat, double lon, double alt, int turns, float radius);
-    void reposition(int sysid, double lat_target, double lon_target, double alt_target, double v);
+    void reposition(int sysid, double lat, double lon, double alt, double v);
 
     // ack wait
     int wait_for_ack(int sysid, int command, int timeout_ms);
