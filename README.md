@@ -30,5 +30,6 @@ sudo apt install -y libssl-dev
 sudo apt install -y nlohmann-json3-dev
 
 ### mavlink router command
-$ mavlink-routerd -e 127.0.0.1:14550  127.0.0.1:14600 /dev/ttyUSB0:115200
+./mavp2p udpc:192.168.144.13:4000 udps:127.0.0.1:14600
+
 
