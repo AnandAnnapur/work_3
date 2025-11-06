@@ -3,6 +3,7 @@
 ### core build libraries
 sudo apt update
 sudo apt install -y build-essential cmake pkg-config git
+sudo apt install -y build-essential cmake libssl-dev libboost-all-dev nlohmann-json3-dev python3-pip git && python3 -m pip install mavproxy
 
 ### rtsp libraries
 sudo apt install -y \
