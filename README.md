@@ -29,6 +29,10 @@ sudo apt install -y libssl-dev
 ### JSON
 sudo apt install -y nlohmann-json3-dev
 
+### Clone the repository
+
+git clone --recursive https://github.com/mavlink/c_library_v2.git
+
 ### mavlink router command
 ./mavp2p udpc:192.168.144.13:4000 udps:127.0.0.1:14600
 
